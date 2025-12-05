@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personal AI Trainer - Gerador de Treinos</title>
+    <!-- Carregamento do Tailwind CSS para estilização -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #111827; /* Fundo Preto/Dark Gray */
+            color: #E5E7EB; /* Texto padrão claro */
+        }
+        /* Estilização para a área de treino gerado (para manter a legibilidade da tabela) */
+        #treinoOutput table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+            text-align: center;
+        }
+        #treinoOutput th, #treinoOutput td {
+            border: 1px solid #374151; /* Borda escura */
+            padding: 0.75rem;
+            text-align: left;
+            font-size: 0.875rem; /* Fonte um pouco menor para caber mais dados */
+        }
+        #treinoOutput th {
+            background-color: #374151; /* Cabeçalho escuro */
+            color: #FBBF24; /* Texto Dourado/Amarelo */
+            font-weight: 600;
+        }
+        #treinoOutput td {
+            color: #F3F4F6;
+        }
+        .form-input {
+            border: 1px solid #4B5563; /* Borda escura */
+            background-color: #1F2937; /* Input de fundo escuro */
+            color: #F3F4F6; /* Texto claro no input */
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            width: 100%;
+        }
+        /* Cor de fundo para as células da tabela */
+        #treinoOutput tr:nth-child(even) {
+            background-color: #1F2937; /* Striped rows */
+        }
+        /* Destaque para o cliente atualmente selecionado na lista */
+        .client-card.selected {
+            border-color: #FBBF24 !important; /* Borda Amarela */
+            background-color: #374151; /* Fundo ligeiramente mais escuro */
+            box-shadow: 0 4px 6px -1px rgba(251, 191, 36, 0.3), 0 2px 4px -2px rgba(251, 191, 36, 0.3);
+        }
+        /* Layout responsivo para colunas da tabela em mobile */
+        @media (max-width: 640px) {
+            #treinoOutput table {
+                display: block;
+                overflow-x: auto;
+                white-space: nowrap;
+            }
+            #treinoOutput thead, #treinoOutput tbody, #treinoOutput th, #treinoOutput td, #treinoOutput tr {
+                display: block;
+            }
+            #treinoOutput thead {
+                display: none; /* Esconde o cabeçalho original em mobile */
+            }
+            /* Recria a tabela como blocos de informação em mobile, se necessário */
+        }
+    </style>
+</head>
+<body class="min-h-screen p-4 sm:p-8 bg-gray-900 text-gray-100">
+
+    <!-- Modal de Confirmação de Exclusão (Substitui confirm()) -->
+    <div id="deleteModal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 hidden">
+        <div class="bg-gray-800 p-6 rounded-xl shadow-2xl max-w-sm w-full border border-red-500">
+            <h3 class="text-xl font-bold text-red-400 mb-4">Confirmação de Exclusão</h3>
+            <p class="text-gray-300 mb-6">Tem certeza que deseja excluir o treino e os dados de <span id="modalClientName" class="font-semibold text-white"></span>?</p>
+            <div class="flex justify-end space-x-3">
+                <button id="cancelDeleteBtn" class="bg-gray-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-gray-700 transition">Cancelar</button>
+                <button id="confirmDeleteBtn" class="bg-red-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-700 transition">Excluir Permanentemente</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Overlay de Loading -->
+    <div id="loadingOverlay" class="fixed inset-0 bg-gray-900 bg-opacity-90 flex items-center justify-center z-50 hidden">
+        <div class="flex flex-col items-center">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-400"></div>
+            <p class="mt-4 text-yellow-400 text-lg">A IA está a periodizar o treino...</p>
+        </div>
+    </div>
+
+    <!-- Cabeçalho da Aplicação -->
+    <header class="text-center mb-8">
+        <h1 class="text-4xl font-extrabold text-yellow-400">Personal AI Trainer 🧠💪</h1>
+        <p class="text-gray-400 mt-2">Geração de Treinos Otimizados por IA e armazenados no Firestore</p>
+    </header>
+
+    <div class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        <!-- Coluna 1: Formulário de Dados do Cliente -->
+        <div class="lg:col-span-1 bg-gray-800 p-6 rounded-xl shadow-2xl h-fit border border-yellow-700/50">
+            <h2 class="text-2xl font-bold text-yellow-400 mb-6 border-b border-gray-700 pb-3">Dados do Cliente</h2>
+            <form id="clientForm" class="space-y-4">
+                
+                <div>
+                    <label for="clientName" class="block text-sm font-medium text-gray-300">Nome do Cliente</label>
+                    <input type="text" id="clientName" required class="form-input mt-1">
+                </div>
+                
+                <!-- Gênero -->
+                <div>
+                    <label for="clientGender" class="block text-sm font-medium text-gray-300">Gênero</label>
+                    <select id="clientGender" required class="form-input mt-1">
+                        <option value="Masculino" selected>Masculino</option>
+                        <option value="Feminino">Feminino</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label for="clientAge" class="block text-sm font-medium text-gray-300">Idade</label>
+                    <input type="number" id="clientAge" required class="form-input mt-1" min="15">
+                </div>
+                
+                <div>
+                    <label for="clientLevel" class="block text-sm font-medium text-gray-300">Nível de Treino</label>
+                    <select id="clientLevel" required class="form-input mt-1">
+                        <option value="Iniciante">Iniciante (0-6 meses)</option>
+                        <option value="Iniciante Avançado">Iniciante Avançado (6-12 meses)</option>
+                        <option value="Intermédio" selected>Intermédio (1-3 anos)</option>
+                        <option value="Intermédio Avançado">Intermédio Avançado (3-5 anos)</option>
+                        <option value="Avançado">Avançado (+5 anos)</option>
+                    </select>
+                </div>
+
+                <!-- OBJETIVO PRINCIPAL EXPANDIDO COM OPÇÃO CUSTOMIZADA -->
+                <div>
+                    <label for="clientGoal" class="block text-sm font-medium text-gray-300">Objetivo Principal</label>
+                    <select id="clientGoal" required class="form-input mt-1">
+                        <option value="Hipertrofia Geral" selected>Hipertrofia Geral (Volume Equilibrado)</option>
+                        <option value="Hipertrofia Estética (Sarcoplasmático)">Hipertrofia Estética (Foco em Volume e Pump)</option>
+                        <option value="Hipertrofia Funcional (Miofibrilar)">Hipertrofia Funcional (Foco em Carga e Força)</option>
+                        <option value="Força Máxima">Força Máxima (Foco em Levantamento)</option>
+                        <option value="Força Explosiva/Potência">Força Explosiva/Potência (Treino de Salto/LPO)</option>
+                        <option value="Resistência Muscular">Resistência Muscular (Alto volume/Circuito)</option>
+                        <option value="Perda de Gordura/Definição">Perda de Gordura/Definição (Déficit calórico/Metabólico)</option>
+                        <option value="Condicionamento Físico Geral">Condicionamento Físico Geral (Equilíbrio)</option>
+                        <option value="Peak de Performance (Pré-Competição)">Peak de Performance (Pré-Competição)</option>
+                        <option value="Reabilitação e Mobilidade">Reabilitação e Mobilidade</option>
+                        <option value="Flexibilidade e Amplitude de Movimento">Flexibilidade e Amplitude de Movimento</option>
+                        <option value="Outro (Especificar)">Outro (Especificar)</option> <!-- Opção para customização -->
+                    </select>
+                    <!-- Campo de texto para objetivo customizado, escondido por padrão -->
+                    <input type="text" id="clientCustomGoal" placeholder="Ex: Ganho de 10kg no Agachamento em 4 semanas" class="form-input mt-1 hidden">
+                </div>
+                
+                <!-- Divisão do Treino (Split) COM OPÇÃO CUSTOMIZADA -->
+                <div>
+                    <label for="clientSplit" class="block text-sm font-medium text-gray-300">Divisão do Treino (Split)</label>
+                    <select id="clientSplit" required class="form-input mt-1">
+                        <option value="Full Body (Corpo Inteiro)">Full Body (Corpo Inteiro)</option>
+                        <option value="Upper/Lower (Superior/Inferior)">Upper/Lower (Superior/Inferior)</option>
+                        <option value="Push/Pull/Legs (Empurrar/Puxar/Pernas)" selected>Push/Pull/Legs (Empurrar/Puxar/Pernas)</option>
+                        <option value="Torso e Membros">Torso e Membros (Tipo 5x5)</option>
+                        <option value="Treino com Foco em Braços">Foco em Braços (Para quem treina 3-4 dias)</option>
+                        <option value="Treino com Foco em Membros Inferiores">Foco em Membros Inferiores (Para quem treina 3-4 dias)</option>
+                        <option value="Específico para Reabilitação/Core">Específico para Reabilitação/Core</option>
+                        <option value="Outro (Especificar Split)">Outro (Especificar Split)</option> <!-- Opção para customização do Split -->
+                    </select>
+                    <!-- Campo de texto para Split customizado, escondido por padrão -->
+                    <textarea id="clientCustomSplit" placeholder="Ex: Upper A, Lower B, Full Body C (3 dias)" class="form-input mt-1 h-12 hidden"></textarea>
+                </div>
+
+                <div>
+                    <label for="clientDays" class="block text-sm font-medium text-gray-300">Dias de Treino por Semana</label>
+                    <input type="number" id="clientDays" required class="form-input mt-1" min="1" max="7" value="4">
+                </div>
+                
+                <!-- Campo Ciclo de Treino -->
+                <div>
+                    <label for="clientCycleTime" class="block text-sm font-medium text-gray-300">Ciclo de Treino (Semanas)</label>
+                    <input type="number" id="clientCycleTime" required class="form-input mt-1" min="2" max="12" value="4">
+                </div>
+
+                <!-- CAMPO ALTERADO PARA MEMÓRIA AUTOMÁTICA -->
+                <div>
+                    <label for="clientPreviousWorkout" class="block text-sm font-medium text-gray-300">Histórico do Último Treino (Memória da IA)</label>
+                    <textarea id="clientPreviousWorkout" class="form-input mt-1 h-20" placeholder="Este campo será preenchido automaticamente com o último treino guardado. Edite para inserir um histórico manual se necessário."></textarea>
+                </div>
+                
+                <div>
+                    <label for="clientLimitations" class="block text-sm font-medium text-gray-300">Lesões / Limitações (Detalhe)</label>
+                    <textarea id="clientLimitations" class="form-input mt-1 h-20" placeholder="Ex: Dor no ombro direito, evitar supino com barra."></textarea>
+                </div>
+                
+                <div>
+                    <label for="clientEquipment" class="block text-sm font-medium text-gray-300">Equipamento Disponível</label>
+                    <select id="clientEquipment" required class="form-input mt-1">
+                        <option value="Ginásio Completo" selected>Ginásio Completo (Incluindo máquinas avançadas)</option>
+                        <option value="Ginásio Básico">Ginásio Básico (Halteres, Barras, Bancos, Máquina de Cabo)</option>
+                        <option value="Estúdio Funcional">Estúdio Funcional (Kettlebells, TRX, Bola Suíça)</option>
+                        <option value="Halteres e Elásticos">Halteres e Elásticos em Casa</option>
+                        <option value="Peso do Corpo">Apenas Peso do Corpo</option>
+                    </select>
+                </div>
+
+                <div class="flex flex-col space-y-3 mt-6">
+                    <button type="submit" id="generateBtn" class="w-full bg-yellow-500 text-gray-900 font-bold py-3 rounded-xl hover:bg-yellow-600 transition duration-300 shadow-xl hover:shadow-yellow-500/50 disabled:opacity-50">
+                        Gerar Treino com IA
+                    </button>
+                    <!-- Botão Novo Cliente/Limpar -->
+                    <button type="button" id="newClientBtn" class="w-full bg-gray-600 text-gray-100 font-bold py-3 rounded-xl hover:bg-gray-700 transition duration-300 shadow-xl disabled:opacity-50">
+                        Novo Cliente / Limpar Formulário
+                    </button>
+                </div>
+                
+                <div id="authStatus" class="text-center text-sm mt-2 text-yellow-500">Aguardando inicialização...</div>
+
+            </form>
+        </div>
+
+        <!-- Coluna 2 e 3: Área de Resultados e Histórico -->
+        <div class="lg:col-span-2 space-y-8">
+            
+            <!-- Resultado do Treino Gerado -->
+            <div class="bg-gray-800 p-6 rounded-xl shadow-2xl border border-yellow-700/50">
+                <div class="flex justify-between items-center border-b border-gray-700 pb-3 mb-4">
+                    <h2 class="text-2xl font-bold text-yellow-400">Treino Gerado <span id="currentClientName" class="text-yellow-600"></span></h2>
+                    <button id="saveBtn" class="bg-gray-500 text-white font-bold py-2 px-4 rounded-xl hover:bg-gray-600 transition duration-300 shadow-md disabled:opacity-50" disabled>
+                        Guardar Treino
+                    </button>
+                </div>
+                <div id="treinoOutput" class="min-h-[200px] text-gray-100 overflow-x-auto">
+                    <p class="text-gray-500 italic">Preencha os dados do cliente e clique em "Gerar Treino com IA".</p>
+                </div>
+                <div id="apiError" class="text-red-400 mt-4 hidden"></div>
+            </div>
+
+            <!-- Histórico de Clientes (Firestore) -->
+            <div class="bg-gray-800 p-6 rounded-xl shadow-2xl border border-yellow-700/50">
+                <h2 class="text-2xl font-bold text-yellow-400 mb-4 border-b border-gray-700 pb-3">Histórico de Clientes (Seu ID: <span id="userIdDisplay" class="font-normal text-sm text-yellow-500 break-all"></span>)</h2>
+                <div id="clientsList" class="space-y-3">
+                    <p class="text-gray-500 italic">Carregando clientes...</p>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Script de Firebase e Lógica da Aplicação -->
+    <script type="module">
+        // Importações do Firebase
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        // Adicionada a função deleteDoc para exclusão
+        import { getFirestore, doc, setDoc, collection, query, onSnapshot, serverTimestamp, getDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        
+        // Ativar logs de debug para o Firestore
+        setLogLevel('debug');
+
+        // Variáveis globais de ambiente (fornecidas pelo Canvas)
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        
+        let app;
+        let db;
+        let auth;
+        let userId = null;
+        let currentGeneratedPlan = null; // Armazena o último treino gerado
+        let currentClientId = null; // Armazena o ID do cliente atual (para salvar/carregar/excluir)
+        let clientToDeleteId = null; // Armazena temporariamente o ID do cliente a ser excluído
+
+        // Elementos DOM
+        const authStatusEl = document.getElementById('authStatus');
+        const generateBtn = document.getElementById('generateBtn');
+        const saveBtn = document.getElementById('saveBtn');
+        const newClientBtn = document.getElementById('newClientBtn'); 
+        const clientForm = document.getElementById('clientForm');
+        const treinoOutputEl = document.getElementById('treinoOutput');
+        const clientsListEl = document.getElementById('clientsList');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const userIdDisplay = document.getElementById('userIdDisplay');
+        const currentClientNameEl = document.getElementById('currentClientName');
+        const apiErrorEl = document.getElementById('apiError');
+        
+        // Modal de Exclusão
+        const deleteModal = document.getElementById('deleteModal');
+        const modalClientNameEl = document.getElementById('modalClientName');
+        const cancelDeleteBtn = document.getElementById('cancelDeleteBtn');
+        const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+
+        // Campos Customizados
+        const clientGoalEl = document.getElementById('clientGoal');
+        const clientCustomGoalEl = document.getElementById('clientCustomGoal');
+        const clientSplitEl = document.getElementById('clientSplit');
+        const clientCustomSplitEl = document.getElementById('clientCustomSplit');
+        // Novo elemento para o campo de memória
+        const clientPreviousWorkoutEl = document.getElementById('clientPreviousWorkout');
+
+        // --- Funções Auxiliares de UI ---
+        
+        function showLoading(show) {
+            loadingOverlay.style.display = show ? 'flex' : 'none';
+            generateBtn.disabled = show;
+            saveBtn.disabled = show;
+        }
+
+        function displayError(message) {
+            apiErrorEl.textContent = `Erro: ${message}`;
+            apiErrorEl.classList.remove('hidden');
+        }
+
+        function clearError() {
+            apiErrorEl.classList.add('hidden');
+            apiErrorEl.textContent = '';
+        }
+        
+        // Função para limpar o formulário e redefinir o estado
+        function clearForm() {
+            // 1. Resetar o formulário
+            clientForm.reset();
+            
+            // 2. Resetar o estado da edição e limpar highlight
+            if (currentClientId) {
+                const oldSelected = document.getElementById(`client-${currentClientId}`);
+                if (oldSelected) {
+                    oldSelected.classList.remove('selected');
+                }
+            }
+            currentClientId = null;
+            currentGeneratedPlan = null;
+
+            // 3. Resetar elementos visuais
+            currentClientNameEl.textContent = '';
+            treinoOutputEl.innerHTML = '<p class="text-gray-500 italic">Preencha os dados do cliente e clique em "Gerar Treino com IA".</p>';
+            clearError();
+
+            // 4. Resetar botão de salvar para o estado inicial
+            saveBtn.textContent = 'Guardar Treino';
+            saveBtn.disabled = true; 
+            saveBtn.classList.remove('bg-yellow-500', 'hover:bg-yellow-600', 'text-gray-900');
+            saveBtn.classList.add('bg-gray-500', 'hover:bg-gray-600', 'text-white');
+
+            // 5. Esconder e limpar campos customizados e o campo de memória
+            clientCustomGoalEl.classList.add('hidden');
+            clientCustomGoalEl.required = false;
+            clientCustomGoalEl.value = '';
+
+            clientCustomSplitEl.classList.add('hidden');
+            clientCustomSplitEl.required = false;
+            clientCustomSplitEl.value = '';
+
+            // Limpa o campo de memória para novos clientes
+            clientPreviousWorkoutEl.value = ''; 
+        }
+        
+        // --- Lógica do Firestore ---
+
+        // Caminho da coleção de clientes para o usuário atual
+        function getClientCollectionRef() {
+            return collection(db, 'artifacts', appId, 'users', userId, 'clients');
+        }
+
+        // Configura o listener para buscar a lista de clientes em tempo real
+        function setupFirestoreListeners() {
+            if (!userId) return;
+
+            const q = query(getClientCollectionRef());
+            
+            onSnapshot(q, (snapshot) => {
+                clientsListEl.innerHTML = '';
+                if (snapshot.empty) {
+                    clientsListEl.innerHTML = '<p class="text-gray-500">Ainda não tem clientes guardados.</p>';
+                } else {
+                    snapshot.forEach((doc) => {
+                        const client = doc.data();
+                        client.id = doc.id;
+                        renderClientCard(client);
+                    });
+                }
+            }, (error) => {
+                console.error("Erro ao ouvir clientes:", error);
+                clientsListEl.innerHTML = '<p class="text-red-500">Erro ao carregar dados.</p>';
+            });
+        }
+
+        // Renderiza um cartão de cliente no histórico
+        function renderClientCard(client) {
+            const card = document.createElement('div');
+            // Classes base do cartão
+            card.className = 'client-card bg-gray-700 p-4 rounded-lg border border-gray-600 transition duration-150 flex justify-between items-center';
+            card.id = `client-${client.id}`;
+
+            // Conteúdo do cartão
+            const content = document.createElement('div');
+            content.className = 'flex-grow cursor-pointer pr-4';
+            content.innerHTML = `
+                <h3 class="font-semibold text-yellow-500 text-lg">${client.clientName}</h3>
+                <p class="text-sm text-gray-300">Objetivo: ${client.clientGoal} | Nível: ${client.clientLevel}</p>
+            `;
+            // Adiciona evento para carregar dados ao clicar no conteúdo (área principal)
+            content.addEventListener('click', () => loadClientData(client.id));
+
+            // Botões de ação (excluir)
+            const actions = document.createElement('div');
+            actions.className = 'flex-shrink-0';
+            
+            const deleteBtn = document.createElement('button');
+            deleteBtn.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-400 hover:text-red-500" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5 0a1 1 0 10-2 0v6a1 1 0 102 0V8z" clip-rule="evenodd" />
+                </svg>
+            `;
+            deleteBtn.title = `Excluir ${client.clientName}`;
+            // Adiciona evento para abrir o modal de exclusão
+            deleteBtn.addEventListener('click', (e) => {
+                e.stopPropagation(); // Previne que o click acione o loadClientData
+                showDeleteModal(client.id, client.clientName);
+            });
+
+            actions.appendChild(deleteBtn);
+            card.appendChild(content);
+            card.appendChild(actions);
+
+            // Se for o cliente atualmente carregado, aplica a classe de destaque
+            if (currentClientId === client.id) {
+                card.classList.add('selected');
+            }
+
+            clientsListEl.appendChild(card);
+        }
+
+        // Exibe o modal de confirmação de exclusão
+        function showDeleteModal(clientId, clientName) {
+            clientToDeleteId = clientId;
+            modalClientNameEl.textContent = clientName;
+            deleteModal.classList.remove('hidden');
+        }
+
+        // Função para exclusão
+        async function deleteClient() {
+            if (!clientToDeleteId || !userId) {
+                console.error("Erro: Cliente ou Usuário não definido para exclusão.");
+                return;
+            }
+
+            showLoading(true);
+
+            try {
+                const docRef = doc(db, 'artifacts', appId, 'users', userId, 'clients', clientToDeleteId);
+                await deleteDoc(docRef);
+
+                // Se o cliente excluído era o que estava no formulário, limpa o formulário
+                if (currentClientId === clientToDeleteId) {
+                    clearForm();
+                }
+
+                // A lista é atualizada automaticamente pelo onSnapshot
+
+            } catch (error) {
+                console.error("Erro ao excluir cliente:", error);
+                displayError("Falha ao excluir o cliente do Firestore.");
+            } finally {
+                clientToDeleteId = null;
+                deleteModal.classList.add('hidden');
+                showLoading(false);
+            }
+        }
+
+
+        // Carrega um treino guardado para visualização
+        async function loadClientData(clientId) {
+            if (!userId) {
+                displayError("Usuário não autenticado para carregar dados.");
+                return;
+            }
+            
+            // 1. Limpa o highlight anterior e aplica o novo
+            if (currentClientId) {
+                const oldSelected = document.getElementById(`client-${currentClientId}`);
+                if (oldSelected) {
+                    oldSelected.classList.remove('selected');
+                }
+            }
+            currentClientId = clientId;
+
+            const newSelected = document.getElementById(`client-${clientId}`);
+            if (newSelected) {
+                newSelected.classList.add('selected');
+            }
+
+            try {
+                const docRef = doc(db, 'artifacts', appId, 'users', userId, 'clients', clientId);
+                const docSnap = await getDoc(docRef);
+
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    
+                    // Preenche o formulário com os dados do cliente
+                    document.getElementById('clientName').value = data.clientName;
+                    document.getElementById('clientGender').value = data.clientGender || 'Masculino';
+                    document.getElementById('clientAge').value = data.clientAge;
+                    document.getElementById('clientLevel').value = data.clientLevel;
+                    
+                    // Lógica para carregar o objetivo (Goal)
+                    const goalIsCustom = !clientGoalEl.querySelector(`option[value="${data.clientGoal}"]`);
+                    if (goalIsCustom) {
+                        clientGoalEl.value = 'Outro (Especificar)';
+                        clientCustomGoalEl.value = data.clientGoal;
+                        clientCustomGoalEl.classList.remove('hidden');
+                        clientCustomGoalEl.required = true;
+                    } else {
+                        clientGoalEl.value = data.clientGoal;
+                        clientCustomGoalEl.classList.add('hidden');
+                        clientCustomGoalEl.required = false;
+                        clientCustomGoalEl.value = '';
+                    }
+
+                    // Lógica para carregar a Divisão (Split)
+                    const splitIsCustom = !clientSplitEl.querySelector(`option[value="${data.clientSplit}"]`);
+                    if (splitIsCustom) {
+                        clientSplitEl.value = 'Outro (Especificar Split)';
+                        clientCustomSplitEl.value = data.clientSplit;
+                        clientCustomSplitEl.classList.remove('hidden');
+                        clientCustomSplitEl.required = true;
+                    } else {
+                        clientSplitEl.value = data.clientSplit;
+                        clientCustomSplitEl.classList.add('hidden');
+                        clientCustomSplitEl.required = false;
+                        clientCustomSplitEl.value = '';
+                    }
+
+                    document.getElementById('clientDays').value = data.clientDays;
+                    document.getElementById('clientCycleTime').value = data.clientCycleTime || '4'; 
+                    
+                    // --- MUDANÇA CRUCIAL: POPULA O CAMPO DE MEMÓRIA COM O TREINO HTML ANTERIOR ---
+                    // Este é o mecanismo de progressão. O novo treino será gerado baseado neste HTML guardado.
+                    document.getElementById('clientPreviousWorkout').value = data.treinoHTML || '';
+                    // O campo de limitações (o único outro campo de texto livre)
+                    document.getElementById('clientLimitations').value = data.clientLimitations || '';
+
+                    document.getElementById('clientEquipment').value = data.clientEquipment;
+
+                    // Exibe o treino
+                    treinoOutputEl.innerHTML = data.treinoHTML || '<p class="text-gray-500 italic">Treino guardado sem conteúdo.</p>';
+                    currentClientNameEl.textContent = `| ${data.clientName}`;
+                    currentGeneratedPlan = data.treinoHTML;
+                    
+                    // Configura o botão para o modo "Atualizar"
+                    saveBtn.disabled = false; 
+                    saveBtn.textContent = 'Atualizar Treino'; 
+                    saveBtn.classList.remove('bg-gray-500', 'hover:bg-gray-600', 'text-white');
+                    saveBtn.classList.add('bg-yellow-500', 'hover:bg-yellow-600', 'text-gray-900');
+
+
+                } else {
+                    displayError("Treino não encontrado.");
+                }
+            } catch (error) {
+                console.error("Erro ao carregar cliente:", error);
+                displayError("Falha ao carregar dados do cliente.");
+            }
+        }
+        
+        // --- Lógica de UI para Campos Customizados ---
+
+        // Lógica para Objetivo Customizado
+        clientGoalEl.addEventListener('change', () => {
+            if (clientGoalEl.value === 'Outro (Especificar)') {
+                clientCustomGoalEl.classList.remove('hidden');
+                clientCustomGoalEl.required = true;
+            } else {
+                clientCustomGoalEl.classList.add('hidden');
+                clientCustomGoalEl.required = false;
+                clientCustomGoalEl.value = ''; // Limpa o input customizado ao voltar
+            }
+        });
+
+        // Lógica para Split Customizado
+        clientSplitEl.addEventListener('change', () => {
+            if (clientSplitEl.value === 'Outro (Especificar Split)') {
+                clientCustomSplitEl.classList.remove('hidden');
+                clientCustomSplitEl.required = true;
+            } else {
+                clientCustomSplitEl.classList.add('hidden');
+                clientCustomSplitEl.required = false;
+                clientCustomSplitEl.value = ''; // Limpa o input customizado ao voltar
+            }
+        });
+
+        // --- Geração de Treino (API Gemini) ---
+        
+        async function fetchGeminiPlan(clientData) {
+            clearError();
+            showLoading(true);
+
+            // O Prompt Mestre que você criou, incorporado como System Instruction
+            const systemInstructionText = `
+                Você é um Treinador de Alta Performance e Especialista em Biomecânica.
+                Siga as diretrizes do ACSM e use a evidência científica mais recente para gerar o treino.
+                O seu objetivo é criar uma rotina de treino de musculação (periodização de um mesociclo).
+
+                REGRAS CIENTÍFICAS:
+                1. Volume de Treino:
+                   - Iniciantes: 6-10 séries semanais por grupo muscular.
+                   - Iniciantes Avançados: 8-12 séries semanais.
+                   - Intermédios: 10-16 séries semanais.
+                   - Intermédios Avançados: 14-18 séries semanais.
+                   - Avançados: 18-22+ séries semanais.
+                2. Seleção de Exercícios: Começar com compostos e terminar com isolados. Ajustar a seleção de exercícios com base no 'Objetivo Principal' detalhado.
+                   - Ex: Para Hipertrofia Estética, use mais exercícios de isolamento e técnicas metabólicas (Drop-sets, Supersets, etc.). Para Hipertrofia Funcional/Força, priorize exercícios com barra/pesos livres e RPE mais alto (foco em tensão mecânica).
+                3. Intensidade e Carga: Use a escala RPE 7-9 (1 a 3 reps na reserva) para hipertrofia, ou RPE 8-10 para força.
+                4. Descanso: 2-4 minutos para compostos pesados, 60-90 segundos para isolados/metabólicos.
+                5. Segurança: Se houver lesão citada, exclua exercícios que sobrecarreguem a articulação afetada e sugira variantes seguras.
+                6. Adaptação de Gênero: Se o gênero for "Feminino" e o objetivo for Hipertrofia, ajuste o volume para priorizar o treino de glúteos e quadríceps (pode alocar volume extra), mantendo o volume superior dentro das diretrizes, respeitando o Split selecionado.
+                7. Progressão: Se o cliente fornecer o 'Último Treino Prescrito', você DEVE analisar o HTML fornecido para entender a rotina anterior e implementar sobrecarga progressiva (aumentando repetições, séries, densidade, ou intensidade/RPE) nos exercícios centrais, mantendo a estrutura original do Split.
+                8. Divisão (Split): A divisão de treino deve seguir rigorosamente o tipo de Split selecionado pelo cliente (${clientData.clientSplit}).
+                
+                FORMATO OBRIGATÓRIO DE SAÍDA:
+                Gere o treino completo em HTML, usando a tag <table>. Não inclua Markdown (como \`\`\`).
+                A tabela DEVE ter as colunas: Exercício, Séries, Repetições, RPE/Intensidade, Descanso, Notas de Execução (Cues).
+                Crie o treino dividido por dia (ex: Dia 1 - Peito/Tríceps).
+                
+                No final da resposta, inclua uma breve justificação científica SOB UMA TAG HTML <p> sobre a escolha da divisão de treino e como ela se relaciona com o ciclo de ${clientData.clientCycleTime} semanas, o objetivo principal, o gênero do cliente e a progressão (se aplicável).
+                A sua resposta deve ser APENAS o HTML da tabela e a justificação.
+            `;
+            
+            // Monta o prompt específico com os dados do cliente
+            const userQuery = `
+                Crie um treino completo e detalhado para este cliente:
+                - Nome: ${clientData.clientName}
+                - Género: ${clientData.clientGender}
+                - Idade: ${clientData.clientAge}
+                - Nível de Treino: ${clientData.clientLevel}
+                - Dias disponíveis: ${clientData.clientDays}
+                - Duração do Ciclo de Treino (Mesociclo): ${clientData.clientCycleTime} semanas.
+                - Objetivo Principal: ${clientData.clientGoal}
+                - Divisão de Treino (Split): ${clientData.clientSplit}
+                - Lesões ou Limitações: ${clientData.clientLimitations || 'Nenhuma'}
+                - Equipamento Disponível: ${clientData.clientEquipment}
+                
+                --- MEMÓRIA DO ÚLTIMO TREINO (USE PARA A PROGRESSÃO) ---
+                ${clientData.clientPreviousWorkout || 'Nenhum histórico de treino anterior fornecido. Comece um novo ciclo.'}
+                --- FIM DA MEMÓRIA ---
+
+                O plano deve ser projetado para um mesociclo de ${clientData.clientCycleTime} semanas, adaptando o volume e a intensidade de acordo com o nível de ${clientData.clientLevel}, o objetivo principal (foco: ${clientData.clientGoal}), o gênero, o Split selecionado e, crucialmente, implementando progressão analisando a 'MEMÓRIA' acima.
+            `;
+            
+            const apiKey = ""; 
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+            const maxRetries = 5;
+
+            // Lógica de Tentar e Repetir (Exponential Backoff)
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    const payload = {
+                        contents: [{ parts: [{ text: userQuery }] }],
+                        systemInstruction: { parts: [{ text: systemInstructionText }] } // Passa a instrução dinâmica
+                    };
+
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                        if (response.status === 429 && i < maxRetries - 1) {
+                            const delay = Math.pow(2, i) * 1000; // Atraso: 1s, 2s, 4s, ...
+                            await new Promise(resolve => setTimeout(resolve, delay));
+                            continue; // Tenta novamente
+                        }
+                        throw new Error(`Erro da API: ${response.status} ${response.statusText}`);
+                    }
+
+                    const result = await response.json();
+                    showLoading(false);
+
+                    const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                    if (text) {
+                        return text; // Retorna o treino gerado em HTML
+                    } else {
+                        throw new Error("Resposta da IA vazia ou mal formatada.");
+                    }
+
+                } catch (error) {
+                    showLoading(false);
+                    console.error("Erro na comunicação com a API Gemini:", error);
+                    displayError(`Falha ao gerar treino: ${error.message}.`);
+                    if (i === maxRetries - 1) throw error; // Re-lança o erro no último retry
+                }
+            }
+        }
+        
+        // --- Handlers de Eventos ---
+        
+        // Modal Handlers
+        cancelDeleteBtn.addEventListener('click', () => {
+            deleteModal.classList.add('hidden');
+            clientToDeleteId = null;
+        });
+
+        confirmDeleteBtn.addEventListener('click', deleteClient);
+
+
+        clientForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            // Determina o objetivo final (dropdown ou input customizado)
+            const goalValue = clientGoalEl.value;
+            const finalGoal = (goalValue === 'Outro (Especificar)' && clientCustomGoalEl.value.trim() !== '') 
+                ? clientCustomGoalEl.value.trim() 
+                : goalValue;
+            
+            if (finalGoal === 'Outro (Especificar)') {
+                displayError("Por favor, especifique o objetivo customizado ou escolha uma opção da lista.");
+                return;
+            }
+
+            // Determina o Split final (dropdown ou input customizado)
+            const splitValue = clientSplitEl.value;
+            const finalSplit = (splitValue === 'Outro (Especificar Split)' && clientCustomSplitEl.value.trim() !== '') 
+                ? clientCustomSplitEl.value.trim() 
+                : splitValue;
+
+            if (finalSplit === 'Outro (Especificar Split)') {
+                displayError("Por favor, especifique o Split customizado ou escolha uma opção da lista.");
+                return;
+            }
+
+            const clientData = {
+                clientName: document.getElementById('clientName').value.trim(),
+                clientGender: document.getElementById('clientGender').value,
+                clientAge: document.getElementById('clientAge').value,
+                clientLevel: document.getElementById('clientLevel').value,
+                clientGoal: finalGoal, // Usa o objetivo final
+                clientSplit: finalSplit, // Usa o split final
+                clientDays: document.getElementById('clientDays').value,
+                clientCycleTime: document.getElementById('clientCycleTime').value, 
+                // Agora envia o conteúdo da área de texto, que contém o HTML do treino anterior se um cliente foi carregado
+                clientPreviousWorkout: clientPreviousWorkoutEl.value.trim(), 
+                clientLimitations: document.getElementById('clientLimitations').value.trim(),
+                clientEquipment: document.getElementById('clientEquipment').value,
+                createdAt: serverTimestamp()
+            };
+
+            if (!clientData.clientName || clientData.clientName.length < 2) {
+                displayError("Por favor, insira um nome de cliente válido.");
+                return;
+            }
+
+            try {
+                // 1. Gerar o treino
+                const treinoHTML = await fetchGeminiPlan(clientData);
+                
+                // 2. Mostrar o treino gerado
+                treinoOutputEl.innerHTML = treinoHTML;
+                currentGeneratedPlan = treinoHTML;
+                currentClientNameEl.textContent = `| ${clientData.clientName}`;
+                
+                // 3. Preparar para guardar/atualizar
+                saveBtn.disabled = false;
+                
+                // Se currentClientId estiver setado, é uma atualização. Se for null, é um novo.
+                if (currentClientId) {
+                    saveBtn.textContent = 'Atualizar Treino'; // Cliente existente está sendo re-gerado
+                } else {
+                    saveBtn.textContent = 'Guardar Treino'; // Novo cliente
+                }
+                
+                saveBtn.classList.remove('bg-gray-500', 'hover:bg-gray-600', 'text-white');
+                saveBtn.classList.add('bg-yellow-500', 'hover:bg-yellow-600', 'text-gray-900');
+
+            } catch (error) {
+                // Erro já tratado e exibido em displayError() dentro de fetchGeminiPlan
+            }
+        });
+
+        saveBtn.addEventListener('click', async () => {
+            if (!currentGeneratedPlan || !userId) {
+                displayError("Nenhum treino para guardar ou usuário não autenticado.");
+                return;
+            }
+
+            // Garante que o objetivo customizado seja salvo corretamente
+            const goalValue = clientGoalEl.value;
+            const finalGoal = (goalValue === 'Outro (Especificar)' && clientCustomGoalEl.value.trim() !== '') 
+                ? clientCustomGoalEl.value.trim() 
+                : goalValue;
+            
+            // Garante que o split customizado seja salvo corretamente
+            const splitValue = clientSplitEl.value;
+            const finalSplit = (splitValue === 'Outro (Especificar Split)' && clientCustomSplitEl.value.trim() !== '') 
+                ? clientCustomSplitEl.value.trim() 
+                : splitValue;
+
+
+            const clientData = {
+                clientName: document.getElementById('clientName').value.trim(),
+                clientGender: document.getElementById('clientGender').value,
+                clientAge: document.getElementById('clientAge').value,
+                clientLevel: document.getElementById('clientLevel').value,
+                clientGoal: finalGoal,
+                clientSplit: finalSplit,
+                clientDays: document.getElementById('clientDays').value,
+                clientCycleTime: document.getElementById('clientCycleTime').value, 
+                // O conteúdo HTML do treino gerado é guardado no campo 'treinoHTML'
+                treinoHTML: currentGeneratedPlan, 
+                // Adicionando um timestamp de atualização
+                updatedAt: serverTimestamp()
+            };
+            
+            // Se um cliente for carregado, ele já tem um ID, então podemos usar esse ID para atualizar.
+            const docId = currentClientId || clientData.clientName.toLowerCase().replace(/\s+/g, '-').slice(0, 50) + '-' + Date.now();
+            const clientDocRef = doc(db, 'artifacts', appId, 'users', userId, 'clients', docId);
+
+            try {
+                await setDoc(clientDocRef, clientData, { merge: true });
+
+                saveBtn.textContent = 'Treino Guardado!';
+                // Desabilita e muda a cor para indicar que foi salvo
+                saveBtn.disabled = true; 
+                saveBtn.classList.remove('bg-yellow-500', 'hover:bg-yellow-600', 'text-gray-900');
+                saveBtn.classList.add('bg-gray-500', 'hover:bg-gray-600', 'text-white');
+                
+                currentClientId = docId; // Atualiza o ID caso seja um novo
+
+                // A lista é atualizada automaticamente pelo onSnapshot
+            } catch (error) {
+                console.error("Erro ao guardar treino:", error);
+                displayError("Falha ao guardar o treino no Firestore.");
+            }
+        });
+        
+        // Listener para o novo botão "Novo Cliente"
+        newClientBtn.addEventListener('click', clearForm);
+
+        // Inicializa o botão de gerar no carregamento
+        generateBtn.disabled = true;
+        saveBtn.disabled = true;
+
+        // --- Configuração Inicial de Autenticação ---
+        if (firebaseConfig) {
+            app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            auth = getAuth(app);
+
+            // Tenta usar o token de auth customizado primeiro
+            const signInPromise = initialAuthToken
+                ? signInWithCustomToken(auth, initialAuthToken).catch(e => {
+                    console.warn("Falha ao entrar com token customizado. Tentando anonimamente.", e);
+                    // Se falhar, tenta anônimo
+                    return signInAnonymously(auth);
+                })
+                : signInAnonymously(auth); // Se não houver token, tenta anônimo
+
+            signInPromise.then(() => {
+                // Configura o listener do estado de autenticação
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        // Usuário autenticado (ou anônimo)
+                        userId = user.uid;
+                        userIdDisplay.textContent = userId;
+                        authStatusEl.textContent = `Sessão ativa. User ID: ${userId.slice(0, 8)}...`;
+                        generateBtn.disabled = false; // Habilita o botão de geração após a autenticação
+                        setupFirestoreListeners(); // Inicia a escuta dos dados
+                    } else {
+                        // Nenhuma sessão ativa (deve ser raro devido ao signInPromise)
+                        userId = null;
+                        userIdDisplay.textContent = 'Não Autenticado';
+                        authStatusEl.textContent = 'Por favor, inicie sessão.';
+                        generateBtn.disabled = true;
+                    }
+                });
+            }).catch(error => {
+                console.error("Erro fatal na autenticação:", error);
+                authStatusEl.textContent = `Erro na autenticação: ${error.message}`;
+            });
+        } else {
+            authStatusEl.textContent = 'Erro: Configuração do Firebase não encontrada.';
+        }
+    </script>
+</body>
+</html>
