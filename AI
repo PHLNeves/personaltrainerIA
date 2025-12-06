@@ -127,28 +127,17 @@
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, collection, query, onSnapshot, serverTimestamp, getDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // =================================================================
-        // ÁREA DE CONFIGURAÇÃO (EDITE AQUI!)
-        // =================================================================
-
-        // PASSO 1: Cole aqui a configuração que você copiou do site do Firebase
-        // Apague tudo que está dentro das chaves { } e cole a sua config
         const firebaseConfig = {
-            apiKey: "COLE_AQUI_SUA_API_KEY_DO_FIREBASE",
-            authDomain: "seu-projeto.firebaseapp.com",
-            projectId: "seu-projeto",
-            storageBucket: "seu-projeto.appspot.com",
-            messagingSenderId: "12345",
-            appId: "1:12345:web:abcdef"
+            apiKey: "AIzaSyDKuonTiHJWgMiOt9VoCc_72nQsB28GZ_s",
+            authDomain: "personal-ia-7fb3b.firebaseapp.com",
+            projectId: "personal-ia-7fb3b",
+            storageBucket: "personal-ia-7fb3b.firebasestorage.app",
+            messagingSenderId: "374103379008",
+            appId: "1:374103379008:web:88d063d49040ad3b33e3a5",
+            measurementId: "G-P85VP2BMS3"
         };
 
-        // PASSO 2: Defina um nome para o seu App (pode manter este ou mudar)
         const appId = 'personal-trainer-app-v1';
-
-        // =================================================================
-        // FIM DA ÁREA DE CONFIGURAÇÃO DO FIREBASE
-        // =================================================================
-
         let app, db, auth, userId = null, currentGeneratedPlan = null, currentClientId = null, clientToDeleteId = null;
 
         // Elementos DOM
@@ -247,15 +236,7 @@
         // GEMINI API
         async function fetchGeminiPlan(data) {
             clearError(); showLoading(true);
-            
-            // =================================================================
-            // PASSO 3: CONFIGURAÇÃO DA CHAVE GEMINI (API KEY)
-            // =================================================================
-            
-            const apiKey = "COLE_AQUI_SUA_CHAVE_DO_GEMINI"; // <--- COLE SUA CHAVE DENTRO DAS ASPAS
-
-            // =================================================================
-
+            const apiKey = "personal-ia-7fb3b";
             const systemPrompt = `Você é um Treinador Expert (ACSM). Crie um treino em Tabela HTML.
             Regras: Volume adequado ao nível (${data.clientLevel}). Sobrecarga progressiva baseada na 'MEMÓRIA' fornecida.
             Objetivo: ${data.clientGoal}. Split: ${data.clientSplit}. Gênero: ${data.clientGender}.
