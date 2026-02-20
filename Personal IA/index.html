@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personal AI Trainer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        :root { --gold: #D4AF37; --black: #0f172a; }
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background-color: var(--black); 
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .gold-text { color: var(--gold); }
+        .gold-btn {
+            background-color: var(--gold);
+            color: black;
+            transition: all 0.3s ease;
+        }
+        .gold-btn:hover:not(:disabled) { background-color: #b8962d; transform: scale(1.02); }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(212, 175, 55, 0.2);
+            padding: 2.5rem;
+            border-radius: 1.5rem;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+        }
+        .form-input {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            color: white;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            outline: none;
+            width: 100%;
+        }
+        .form-input:focus { border-color: var(--gold); }
+    </style>
+</head>
+<body>
+
+    <div class="glass-card text-center">
+        <h1 style="font-family: 'Playfair Display', serif;" class="text-4xl gold-text mb-2">Personal AI</h1>
+        <p id="authSubtitle" class="text-gray-400 text-sm mb-8">Autenticação de Segurança</p>
+        
+        <div id="authError" class="hidden bg-red-900/40 border border-red-500 text-red-100 text-[11px] p-3 rounded-lg mb-4 text-left"></div>
+
+        <form id="authForm" class="space-y-4">
+            <input type="email" id="email" placeholder="E-mail" required class="form-input">
+            <input type="password" id="password" placeholder="Senha" required class="form-input">
+            
+            <button type="submit" id="submitBtn" class="w-full gold-btn font-bold py-3 rounded-lg mt-4 shadow-lg">
+                Realizar Login
+            </button>
+        </form>
+
+        <div class="mt-6 text-sm">
+            <span id="toggleText" class="text-gray-500">Novo profissional?</span>
+            <button id="toggleBtn" class="gold-text font-bold ml-1 hover:underline">Criar conta</button>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyASaxZipSKuPVkc1EmO4Bh5yy8L3uYWPFg",
+            authDomain: "personal-ia-dbc76.firebaseapp.com",
+            projectId: "personal-ia-dbc76",
+            storageBucket: "personal-ia-dbc76.firebasestorage.app",
+            messagingSenderId: "409609385982",
+            appId: "1:409609385982:web:678c15e43de9edc9bcf2af"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+
+        
+        const authForm = document.getElementById('authForm');
+        const authError = document.getElementById('authError');
+        const submitBtn = document.getElementById('submitBtn');
+        const toggleBtn = document.getElementById('toggleBtn');
+        
+        let isRegisterMode = false;
+
+        toggleBtn.onclick = () => {
+            isRegisterMode = !isRegisterMode;
+            submitBtn.textContent = isRegisterMode ? 'Registar Novo Acesso' : 'Acessar conta';
+            toggleBtn.textContent = isRegisterMode ? 'Voltar ao Login' : 'Criar conta';
+        };
+
+        authForm.onsubmit = async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            authError.classList.add('hidden');
+            submitBtn.disabled = true;
+
+            try {
+                if (isRegisterMode) {
+                    await createUserWithEmailAndPassword(auth, email, password);
+                } else {
+                    await signInWithEmailAndPassword(auth, email, password);
+                }
+            } catch (err) {
+                authError.textContent = "Erro de autenticação: Verifique as credenciais.";
+                authError.classList.remove('hidden');
+                submitBtn.disabled = false;
+            }
+        };
+
+        // REDIRECIONAMENTO AO LOGAR
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                console.log("Sucesso! Redirecionando...");
+                window.location.href = 'personalia.html';
+            }
+        });
+    </script>
+</body>
+</html>
