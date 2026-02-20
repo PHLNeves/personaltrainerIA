@@ -1,10 +1,13 @@
 # personaltrainerIA
-Projeto Web com IA – Educação Física
-Projeto simples desenvolvido em HTML, voltado para profissionais de Educação Física.
+# iaruncoach
 
-Objetivo
-Criar uma interface simples para auxiliar profissionais da área, utilizando conceitos básicos de IA com apoio de ferramentas como o Gemini.
+Projeto desenvolvido em Java - HTML.
 
-Tecnologias
-HTML
-Conceitos básicos de IA
+## Objetivo
+Criar uma interface para auxiliar na criação de treinos de musculação, utilizando conceitos básicos de IA com apoio de ferramentas como o Gemini.
+
+## Tecnologias
+- JAVA, HTML
+- Conceitos básicos de IA
+- Banco de dados Firebase
+
