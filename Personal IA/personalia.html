@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personal AI Trainer - Gerador de Treinos</title>
+    
+    <!-- Carregamento da api -->
+    <script src="config.js"></script>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #f1f5f9; }
+        .form-input { border: 1px solid #334155; background-color: #1e293b; color: #f8fafc; padding: 0.6rem 1rem; border-radius: 0.5rem; width: 100%; transition: all 0.2s; }
+        .form-input:focus { border-color: #eab308; outline: none; box-shadow: 0 0 0 2px rgba(234, 179, 8, 0.2); }
+        .tab-btn { border-bottom: 3px solid transparent; color: #94a3b8; font-weight: 500; transition: all 0.2s; padding: 1rem 1.5rem; }
+        .tab-btn.active { border-bottom: 3px solid #eab308; color: #eab308; font-weight: 700; }
+        
+        /* Estilização da Tabela Gerada pela IA */
+        #treinoOutput table { width: 100%; border-collapse: collapse; margin-top: 1rem; background: #1e293b; border-radius: 8px; overflow: hidden; }
+        #treinoOutput th { background: #334155; color: #eab308; padding: 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #0f172a; }
+        #treinoOutput td { border-bottom: 1px solid #334155; padding: 12px; color: #cbd5e1; }
+        #treinoOutput tr:hover { background: rgba(234, 179, 8, 0.05); }
+        .hidden-el { display: none; }
+    </style>
+</head>
+<body class="min-h-screen p-4 sm:p-8">
+
+    <!-- Overlay de Carregamento -->
+    <div id="loadingOverlay" class="fixed inset-0 bg-slate-900/90 flex items-center justify-center z-50 hidden text-center">
+        <div class="flex flex-col items-center p-6">
+            <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-yellow-500 mb-4"></div>
+            <p class="text-yellow-500 font-bold text-lg">O treino está sendo gerado com base no histórico.</p>
+            <p class="text-slate-400 text-sm mt-2">Analisando progressão de carga e volume...</p>
+        </div>
+    </div>
+
+    <header class="text-center mb-8 relative">
+        <div class="absolute top-0 right-0 flex flex-col items-end gap-1">
+            <span id="userDisplay" class="text-[10px] text-slate-500 font-medium"></span> 
+            <button id="logoutBtn" class="bg-red-900/20 text-red-400 border border-red-500/30 px-4 py-2 rounded-lg text-xs font-bold hover:bg-red-500/20 transition">
+                Logout
+            </button>
+        </div>
+        <h1 class="text-4xl font-extrabold text-yellow-500">Personal Trainer AI</h1>
+        <p class="text-slate-400 mt-2">Treinos Avançados com Memória de Progressão</p>
+    </header>
+
+    <div class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <!-- Coluna Esquerda: Formulário Detalhado -->
+        <div class="lg:col-span-4 space-y-6">
+            <div class="bg-slate-800 p-6 rounded-2xl shadow-xl border border-yellow-700/50">
+                <h2 class="text-2xl font-bold text-yellow-400 mb-6 border-b border-slate-700 pb-3">Dados do Cliente</h2>
+                <form id="clientForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300">Nome</label>
+                        <input type="text" id="clientName" required class="form-input mt-1">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300">Gênero</label>
+                            <select id="clientGender" required class="form-input mt-1">
+                                <option value="Masculino">Masculino</option>
+                                <option value="Feminino">Feminino</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300">Idade</label>
+                            <input type="number" id="clientAge" required class="form-input mt-1" min="15">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300">Nível</label>
+                        <select id="clientLevel" required class="form-input mt-1">
+                            <option value="Iniciante">Iniciante</option>
+                            <option value="Iniciante Avançado">Iniciante Avançado</option>
+                            <option value="Intermediário" selected>Intermediário</option>
+                            <option value="Intermediário Avançado">Intermediário Avançado</option>
+                            <option value="Avançado">Avançado</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300">Objetivo</label>
+                        <select id="clientGoal" required class="form-input mt-1">
+                            <option value="Hipertrofia Geral">Hipertrofia Geral</option>
+                            <option value="Hipertrofia Estética">Hipertrofia Estética</option>
+                            <option value="Hipertrofia Funcional">Hipertrofia Funcional</option>
+                            <option value="Força Máxima">Força Máxima</option>
+                            <option value="Força Explosiva">Força Explosiva</option>
+                            <option value="Resistência Muscular">Resistência Muscular</option>
+                            <option value="Perda de Gordura">Perda de Gordura</option>
+                            <option value="Condicionamento Geral">Condicionamento Geral</option>
+                            <option value="Reabilitação">Reabilitação</option>
+                            <option value="Outro (Especificar)">Outro (Especificar)</option>
+                        </select>
+                        <input type="text" id="clientCustomGoal" placeholder="Especifique o objetivo..." class="form-input mt-1 hidden-el">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300">Split (Divisão)</label>
+                        <select id="clientSplit" required class="form-input mt-1">
+                            <option value="Full Body">Full Body</option>
+                            <option value="Upper/Lower">Upper/Lower</option>
+                            <option value="Push/Pull/Legs" selected>Push/Pull/Legs</option>
+                            <option value="Torso e Membros">Torso e Membros</option>
+                            <option value="Foco em Braços">Foco em Braços</option>
+                            <option value="Foco em Membros Inferiores">Foco em Membros Inferiores</option>
+                            <option value="Outro (Especificar Split)">Outro (Especificar Split)</option>
+                        </select>
+                        <textarea id="clientCustomSplit" placeholder="Especifique a divisão..." class="form-input mt-1 h-12 hidden-el"></textarea>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300">Dias/Semana</label>
+                            <input type="number" id="clientDays" required class="form-input mt-1" min="1" max="7" value="4">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300">Ciclo (Semanas)</label>
+                            <input type="number" id="clientCycleTime" required class="form-input mt-1" min="2" max="12" value="4">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300">Equipamento Disponível</label>
+                        <select id="clientEquipment" required class="form-input mt-1">
+                            <option value="Academia Completa" selected>Academia Completa</option>
+                            <option value="Academia Básica">Academia Básica</option>
+                            <option value="Estúdio Funcional">Estúdio Funcional</option>
+                            <option value="Halteres e Elásticos">Halteres e Elásticos</option>
+                            <option value="Peso do Corpo">Peso do Corpo</option>
+                            <option value="Outro (Especificar Equipamento)">Outro (Especificar Equipamento)</option>
+                        </select>
+                        <textarea id="clientCustomEquipment" placeholder="Especifique o equipamento..." class="form-input mt-1 h-12 hidden-el"></textarea>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300">Histórico/Notas do Professor</label>
+                        <textarea id="clientPreviousWorkout" class="form-input mt-1 h-20" placeholder="A IA usará o treino salvo + estas notas para progredir..."></textarea>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300">Limitações</label>
+                        <textarea id="clientLimitations" class="form-input mt-1 h-20" placeholder="Lesões, dores, patologias..."></textarea>
+                    </div>
+
+                    <div class="flex flex-col space-y-3 mt-6">
+                        <button type="submit" id="generateBtn" class="w-full bg-yellow-500 text-slate-900 font-bold py-3 rounded-xl hover:bg-yellow-600 transition shadow-xl disabled:opacity-50">Gerar Próximo Treino</button>
+                    </div>
+                    <div id="authStatus" class="text-center text-sm mt-2 text-yellow-500 italic">Conectando...</div>
+                </form>
+            </div>
+
+            <div class="bg-slate-800 p-6 rounded-2xl shadow-lg border border-slate-700">
+                <h3 class="font-bold text-slate-300 mb-4 flex justify-between items-center">
+                    <span>Alunos Salvos</span>
+                    <button id="newClientBtn" class="text-xs text-yellow-500 underline">Novo Cliente</button>
+                </h3>
+                <div id="clientsList" class="space-y-2 max-h-60 overflow-y-auto text-sm">
+                    <div class="text-slate-500 italic">Carregando histórico...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Coluna Direita: Resultados -->
+        <div class="lg:col-span-8 space-y-6">
+            <div class="bg-slate-800 rounded-2xl shadow-xl border border-slate-700 overflow-hidden">
+                <div class="flex border-b border-slate-700 bg-slate-900/50">
+                    <button id="tabTreino" class="tab-btn active">Treino Gerado</button>
+                </div>
+
+                <div class="p-6">
+                    <div id="contentTreino">
+                        <div class="flex justify-between items-center mb-6">
+                            <h2 class="text-2xl font-bold text-yellow-500" id="displayClientName">Nova Prescrição</h2>
+                            <div class="flex gap-2">
+                                <button id="pdfBtn" disabled class="bg-slate-700 text-slate-300 py-2 px-4 rounded-lg text-sm font-bold hover:bg-slate-600 disabled:opacity-50">PDF</button>
+                                <button id="saveBtn" disabled class="bg-slate-700 text-slate-300 py-2 px-4 rounded-lg text-sm font-bold hover:bg-slate-600 disabled:opacity-50">Salvar</button>
+                            </div>
+                        </div>
+                        <div id="treinoOutput" class="min-h-[400px] border-t border-slate-700 pt-4 text-slate-500 italic">
+                            Selecione um aluno ou preencha os dados para gerar um novo plano. Se o aluno já tiver treino salvo, a IA irá evoluir a partir dele.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, collection, query, onSnapshot, serverTimestamp, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyASaxZipSKuPVkc1EmO4Bh5yy8L3uYWPFg",
+            authDomain: "personal-ia-dbc76.firebaseapp.com",
+            projectId: "personal-ia-dbc76",
+            appId: "1:409609385982:web:678c15e43de9edc9bcf2af"
+        };
+        const appId = 'personal-trainer-v3';
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        let user = null;
+        let activeClientId = null;
+        let currentHtml = "";
+        let lastWorkoutContent = ""; // Memória temporária do treino anterior
+
+        // Funcionalidade de Logout
+        document.getElementById('logoutBtn').onclick = async () => {
+            try {
+                await signOut(auth);
+                window.location.href = 'index.html';
+            } catch (e) {
+                console.error("Erro ao sair:", e);
+            }
+        };
+
+        onAuthStateChanged(auth, u => { 
+            if(u) { 
+                user = u; 
+                document.getElementById('authStatus').textContent = "Conectado ao Sistema";
+                document.getElementById('userDisplay').textContent = u.email;
+                loadClients(); 
+            } else {
+                window.location.href = 'index.html';
+            }
+        });
+
+        // Toggle campos "Outro"
+        document.getElementById('clientGoal').addEventListener('change', (e) => {
+            document.getElementById('clientCustomGoal').classList.toggle('hidden-el', e.target.value !== 'Outro (Especificar)');
+        });
+        document.getElementById('clientSplit').addEventListener('change', (e) => {
+            document.getElementById('clientCustomSplit').classList.toggle('hidden-el', e.target.value !== 'Outro (Especificar Split)');
+        });
+        document.getElementById('clientEquipment').addEventListener('change', (e) => {
+            document.getElementById('clientCustomEquipment').classList.toggle('hidden-el', e.target.value !== 'Outro (Especificar Equipamento)');
+        });
+
+        function loadClients() {
+            if (!user) return;
+            const q = query(collection(db, 'artifacts', appId, 'users', user.uid, 'clients'));
+            onSnapshot(q, (snap) => {
+                const list = document.getElementById('clientsList');
+                list.innerHTML = "";
+                
+                if (snap.empty) {
+                    list.innerHTML = `<div class="text-slate-500 italic text-center py-4">Nenhum aluno salvo.</div>`;
+                    return;
+                }
+
+                snap.forEach(d => {
+                    const data = d.data();
+                    const item = document.createElement('div');
+                    item.className = "group flex items-center justify-between p-3 bg-slate-700/40 border border-slate-600/50 rounded-xl cursor-pointer hover:border-yellow-500/50 transition mb-2";
+                    
+                    item.innerHTML = `
+                        <div class="flex-grow">
+                            <strong class="text-slate-200">${data.name}</strong><br>
+                            <small class="text-yellow-500/70">${data.goal}</small>
+                        </div>
+                        <button class="delete-client-btn p-2 text-slate-500 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity" data-id="${d.id}" title="Excluir Aluno">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                        </button>
+                    `;
+
+                    item.onclick = (e) => {
+                        if (e.target.closest('.delete-client-btn')) return;
+                        activeClientId = d.id;
+                        document.getElementById('treinoOutput').innerHTML = data.html;
+                        currentHtml = data.html;
+                        lastWorkoutContent = data.html; // Carrega para a memória de progressão
+                        document.getElementById('displayClientName').textContent = data.name;
+                        document.getElementById('clientName').value = data.name;
+                        document.getElementById('saveBtn').disabled = false;
+                        document.getElementById('pdfBtn').disabled = false;
+                    };
+
+                    const deleteBtn = item.querySelector('.delete-client-btn');
+                    deleteBtn.onclick = async (e) => {
+                        e.stopPropagation();
+                        const confirmDelete = confirm(`Tem certeza que deseja excluir os dados de ${data.name}?`);
+                        if (confirmDelete) {
+                            try {
+                                await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'clients', d.id));
+                                if (activeClientId === d.id) {
+                                    document.getElementById('newClientBtn').click();
+                                }
+                            } catch (err) {
+                                console.error("Erro ao excluir:", err);
+                            }
+                        }
+                    };
+                    list.appendChild(item);
+                });
+            }, (err) => console.error("Erro ao carregar clientes:", err));
+        }
+
+        document.getElementById('clientForm').onsubmit = async (e) => {
+            e.preventDefault();
+            
+            // Verificação da chave configurada
+            if (!window.GEMINI_CONFIG || !window.GEMINI_CONFIG.apiKey || window.GEMINI_CONFIG.apiKey.includes("chaveapi")) {
+                alert("Erro: A chave da API não foi encontrada no arquivo config.js");
+                return;
+            }
+
+            document.getElementById('loadingOverlay').classList.remove('hidden');
+            
+            const goalValue = document.getElementById('clientGoal').value;
+            const finalGoal = goalValue === 'Outro (Especificar)' ? document.getElementById('clientCustomGoal').value : goalValue;
+            
+            const splitValue = document.getElementById('clientSplit').value;
+            const finalSplit = splitValue === 'Outro (Especificar Split)' ? document.getElementById('clientCustomSplit').value : splitValue;
+
+            const equipmentValue = document.getElementById('clientEquipment').value;
+            const finalEquipment = equipmentValue === 'Outro (Especificar Equipamento)' ? document.getElementById('clientCustomEquipment').value : equipmentValue;
+
+            const formData = {
+                name: document.getElementById('clientName').value,
+                gender: document.getElementById('clientGender').value,
+                age: document.getElementById('clientAge').value,
+                level: document.getElementById('clientLevel').value,
+                goal: finalGoal,
+                split: finalSplit,
+                days: document.getElementById('clientDays').value,
+                cycle: document.getElementById('clientCycleTime').value,
+                equipment: finalEquipment,
+                previous: document.getElementById('clientPreviousWorkout').value,
+                limitations: document.getElementById('clientLimitations').value
+            };
+            
+            // CONSTRUÇÃO DO PROMPT COM MEMÓRIA
+            let memoryInstruction = "";
+            if (activeClientId && lastWorkoutContent) {
+                memoryInstruction = `
+                IMPORTANTE: Este aluno já possui um treino anterior. 
+                TREINO ANTERIOR (HTML): 
+                ---
+                ${lastWorkoutContent}
+                ---
+                Sua tarefa agora é evoluir este treino. Analise o que foi feito antes e aplique princípios de periodização: 
+                - Altere exercícios se necessário para novos estímulos.
+                - Ajuste volume (séries/reps) ou intensidade.
+                - Garanta que não seja uma cópia idêntica, mas uma progressão lógica.`;
+            }
+
+            const prompt = `Atue como um Personal Trainer Expert em Fisiologia do Exercício e Treinamento de Alta Performance. Seu objetivo é criar um protocolo de treinamento periodizado e técnico para o seguinte perfil:
+            Nome: ${formData.name}, Gênero: ${formData.gender}, Idade: ${formData.age} anos.
+            Nível: ${formData.level}, Objetivo principal: ${formData.goal}.
+            Divisão de Treino (Split): ${formData.split}.
+            Frequência: ${formData.days} dias por semana para um ciclo de ${formData.cycle} semanas.
+            Equipamento disponível: ${formData.equipment}.
+            Limitações/Lesões: ${formData.limitations || 'Nenhuma'}.
+            Notas Adicionais do Professor: ${formData.previous || 'Nenhuma'}.
+            ${memoryInstruction}
+
+            RETORNO OBRIGATÓRIO EM PORTUGUÊS:
+            1. Forneça uma tabela HTML estilizada com classes do Tailwind CSS.
+            2. A tabela deve ter colunas: Exercício, Séries/Reps, Intervalo e Observações Técnicas/Cadência.
+            3. Use cores que harmonizem com o dashboard (cinza escuro e amarelo).
+            4. Adicione uma breve introdução justificando as escolhas de progressão e dicas para o próximo ciclo.`;
+
+            try {
+                const apiKey = window.GEMINI_CONFIG.apiKey;
+                // Usando modelo estável e performático
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+                
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: prompt }] }]
+                    })
+                });
+
+                if (!response.ok) {
+                    const errBody = await response.json();
+                    throw new Error(errBody.error?.message || "Erro na API.");
+                }
+
+                const data = await response.json();
+                let resultText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+                
+                resultText = resultText.replace(/```html|```/g, "").trim();
+
+                document.getElementById('treinoOutput').innerHTML = resultText;
+                currentHtml = resultText;
+                document.getElementById('displayClientName').textContent = formData.name;
+                document.getElementById('saveBtn').disabled = false;
+                document.getElementById('pdfBtn').disabled = false;
+
+            } catch (err) {
+                console.error(err);
+                document.getElementById('treinoOutput').innerHTML = `<div class="p-4 bg-red-900/20 text-red-400 border border-red-500/50 rounded-lg">Erro ao gerar treino: ${err.message}</div>`;
+            } finally {
+                document.getElementById('loadingOverlay').classList.add('hidden');
+            }
+        };
+
+        document.getElementById('saveBtn').onclick = async () => {
+            if (!user || !currentHtml) return;
+            const id = activeClientId || `client_${Date.now()}`;
+            try {
+                await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'clients', id), {
+                    name: document.getElementById('clientName').value,
+                    goal: document.getElementById('clientGoal').value,
+                    html: currentHtml,
+                    updatedAt: serverTimestamp()
+                }, { merge: true });
+                alert("Treino e progresso salvos com sucesso!");
+                lastWorkoutContent = currentHtml; // Atualiza a memória local após salvar
+                activeClientId = id;
+            } catch (e) {
+                alert("Erro ao salvar no banco de dados.");
+                console.error(e);
+            }
+        };
+
+        document.getElementById('pdfBtn').onclick = () => {
+            const element = document.getElementById('treinoOutput');
+            const name = document.getElementById('clientName').value || "Treino";
+            html2pdf().from(element).set({ 
+                margin: 10, 
+                filename: `Treino_${name}.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2, backgroundColor: '#0f172a' },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            }).save();
+        };
+
+        document.getElementById('newClientBtn').onclick = () => {
+            document.getElementById('clientForm').reset();
+            activeClientId = null;
+            lastWorkoutContent = "";
+            document.getElementById('treinoOutput').innerHTML = "Campos limpos. Pronto para nova geração.";
+            document.getElementById('displayClientName').textContent = "Nova Prescrição";
+            document.getElementById('saveBtn').disabled = true;
+            document.getElementById('pdfBtn').disabled = true;
+            document.getElementById('clientCustomGoal').classList.add('hidden-el');
+            document.getElementById('clientCustomSplit').classList.add('hidden-el');
+            document.getElementById('clientCustomEquipment').classList.add('hidden-el');
+        };
+    </script>
+</body>
+</html>
