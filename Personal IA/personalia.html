@@ -23,6 +23,14 @@
         #treinoOutput th { background: #334155; color: #eab308; padding: 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #0f172a; }
         #treinoOutput td { border-bottom: 1px solid #334155; padding: 12px; color: #cbd5e1; }
         #treinoOutput tr:hover { background: rgba(234, 179, 8, 0.05); }
+        
+        /* Estilo visual para indicar que é editável */
+        #treinoOutput[contenteditable="true"]:focus {
+            outline: none;
+            border: 1px solid #eab308;
+            border-radius: 8px;
+        }
+
         .hidden-el { display: none; }
     </style>
 </head>
@@ -183,8 +191,8 @@
                                 <button id="saveBtn" disabled class="bg-slate-700 text-slate-300 py-2 px-4 rounded-lg text-sm font-bold hover:bg-slate-600 disabled:opacity-50">Salvar</button>
                             </div>
                         </div>
-                        <div id="treinoOutput" class="min-h-[400px] border-t border-slate-700 pt-4 text-slate-500 italic">
-                            Selecione um aluno ou preencha os dados para gerar um novo plano. Se o aluno já tiver treino salvo, a IA irá evoluir a partir dele.
+                        <div id="treinoOutput" contenteditable="true" class="min-h-[400px] border-t border-slate-700 pt-4 text-slate-500 italic">
+                            Selecione um aluno ou preencha os dados para gerar um novo plano. Se o aluno já tiver treino salvo, a IA irá evoluir a partir dele. Você pode clicar e digitar aqui para editar o treino gerado.
                         </div>
                     </div>
                 </div>
@@ -211,9 +219,8 @@
         let user = null;
         let activeClientId = null;
         let currentHtml = "";
-        let lastWorkoutContent = ""; // Memória temporária do treino anterior
+        let lastWorkoutContent = ""; 
 
-        // Funcionalidade de Logout
         document.getElementById('logoutBtn').onclick = async () => {
             try {
                 await signOut(auth);
@@ -234,7 +241,6 @@
             }
         });
 
-        // Toggle campos "Outro"
         document.getElementById('clientGoal').addEventListener('change', (e) => {
             document.getElementById('clientCustomGoal').classList.toggle('hidden-el', e.target.value !== 'Outro (Especificar)');
         });
@@ -279,11 +285,12 @@
                         activeClientId = d.id;
                         document.getElementById('treinoOutput').innerHTML = data.html;
                         currentHtml = data.html;
-                        lastWorkoutContent = data.html; // Carrega para a memória de progressão
+                        lastWorkoutContent = data.html; 
                         document.getElementById('displayClientName').textContent = data.name;
                         document.getElementById('clientName').value = data.name;
                         document.getElementById('saveBtn').disabled = false;
                         document.getElementById('pdfBtn').disabled = false;
+                        document.getElementById('treinoOutput').classList.remove('italic');
                     };
 
                     const deleteBtn = item.querySelector('.delete-client-btn');
@@ -309,7 +316,6 @@
         document.getElementById('clientForm').onsubmit = async (e) => {
             e.preventDefault();
             
-            // Verificação da chave configurada
             if (!window.GEMINI_CONFIG || !window.GEMINI_CONFIG.apiKey || window.GEMINI_CONFIG.apiKey.includes("chaveapi")) {
                 alert("Erro: A chave da API não foi encontrada no arquivo config.js");
                 return;
@@ -340,7 +346,6 @@
                 limitations: document.getElementById('clientLimitations').value
             };
             
-            // CONSTRUÇÃO DO PROMPT COM MEMÓRIA
             let memoryInstruction = "";
             if (activeClientId && lastWorkoutContent) {
                 memoryInstruction = `
@@ -355,7 +360,7 @@
                 - Garanta que não seja uma cópia idêntica, mas uma progressão lógica.`;
             }
 
-            const prompt = `Atue como um Personal Trainer Expert em Fisiologia do Exercício e Treinamento de Alta Performance. Seu objetivo é criar um protocolo de treinamento periodizado e técnico para o seguinte perfil:
+            const prompt = `Atue como um auxiliar de Personal Trainer, expert em Fisiologia do Exercício e Treinamento de Alta Performance. Seu objetivo é criar um protocolo de treinamento periodizado e técnico para auxiliar o trabalho do profissional de Educação Física, de acordo com o seguinte perfil:
             Nome: ${formData.name}, Gênero: ${formData.gender}, Idade: ${formData.age} anos.
             Nível: ${formData.level}, Objetivo principal: ${formData.goal}.
             Divisão de Treino (Split): ${formData.split}.
@@ -369,11 +374,11 @@
             1. Forneça uma tabela HTML estilizada com classes do Tailwind CSS.
             2. A tabela deve ter colunas: Exercício, Séries/Reps, Intervalo e Observações Técnicas/Cadência.
             3. Use cores que harmonizem com o dashboard (cinza escuro e amarelo).
-            4. Adicione uma breve introdução justificando as escolhas de progressão e dicas para o próximo ciclo.`;
+            4. Adicione uma breve introdução justificando as escolhas de progressão e dicas para o próximo ciclo.
+            5. Certifique-se de que as células da tabela contenham apenas o texto, sem tags extras complicadas, para facilitar a edição manual pelo professor.`;
 
             try {
                 const apiKey = window.GEMINI_CONFIG.apiKey;
-                // Usando modelo estável e performático
                 const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
                 
                 const response = await fetch(url, {
@@ -395,6 +400,7 @@
                 resultText = resultText.replace(/```html|```/g, "").trim();
 
                 document.getElementById('treinoOutput').innerHTML = resultText;
+                document.getElementById('treinoOutput').classList.remove('italic');
                 currentHtml = resultText;
                 document.getElementById('displayClientName').textContent = formData.name;
                 document.getElementById('saveBtn').disabled = false;
@@ -408,6 +414,11 @@
             }
         };
 
+        // Atualiza o conteúdo atual sempre que houver edição manual
+        document.getElementById('treinoOutput').addEventListener('input', () => {
+            currentHtml = document.getElementById('treinoOutput').innerHTML;
+        });
+
         document.getElementById('saveBtn').onclick = async () => {
             if (!user || !currentHtml) return;
             const id = activeClientId || `client_${Date.now()}`;
@@ -415,11 +426,11 @@
                 await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'clients', id), {
                     name: document.getElementById('clientName').value,
                     goal: document.getElementById('clientGoal').value,
-                    html: currentHtml,
+                    html: currentHtml, // Salva o HTML editado
                     updatedAt: serverTimestamp()
                 }, { merge: true });
                 alert("Treino e progresso salvos com sucesso!");
-                lastWorkoutContent = currentHtml; // Atualiza a memória local após salvar
+                lastWorkoutContent = currentHtml; 
                 activeClientId = id;
             } catch (e) {
                 alert("Erro ao salvar no banco de dados.");
@@ -444,6 +455,7 @@
             activeClientId = null;
             lastWorkoutContent = "";
             document.getElementById('treinoOutput').innerHTML = "Campos limpos. Pronto para nova geração.";
+            document.getElementById('treinoOutput').classList.add('italic');
             document.getElementById('displayClientName').textContent = "Nova Prescrição";
             document.getElementById('saveBtn').disabled = true;
             document.getElementById('pdfBtn').disabled = true;
